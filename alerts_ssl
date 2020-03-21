@@ -1,0 +1,71 @@
+INTRODUCTION
+
+-prometheus server acts as an exporter to report metrics
+-grafana acts as the graphical front-en dfor data display
+-now we need to set up an alert, route it to a service like slack, lock down ports and add ssl
+
+ALERTS
+
+-alerts are necessary to get things reported automatically
+-prometheus uses alert rules to define how to deal with certain conditions 
+-suppose an instance goes down then alert will be fired by setting up the following changes:
+	-add alert.rules files
+	-map this file to the container through docker-compose.yml
+	-edit prometheus.yml to make it use this file
+
+PROMETHEUS EXPRESSIONS
+
+-the above specified alert rule syntax is based on the prometheus expression language
+-it allows to set up conditions based on complex queries of metrics
+-in the above alert rule file, query is made against the metric of up state of the exporters
+-this binary metric reports 1 or 0 based on the cnfigured exporters
+-to view this, run the following command, refresh the graph and check the alerts page:
+	-> docker-compose stop node-exporter
+
+LOAD CHECK
+
+-to set up an alert for load above 0.5, see high_load section in alert.rules file
+-trigger this alert by creating some load:
+	-> docker run --rm -it busybox sh -c "while true; do :; done"
+
+ALERTMANAGER
+
+-alerts are metrics that can be displayed
+-alerts can easily be added to the grafana dashboard
+-apart from having this kind of display, one should also be notified via email or slack
+-for this, a component known as alertmanager should be added which is also a part of prometheus:
+	-extend docker-compose.yml with a section of alertmanager to launch a container
+	-pass a -alertmanager.url flag to the same file in order to tell prometheus how to connect to the alertmanager
+	-also, provide an alertmanager.yml config file with the specific alert routes
+
+SLACK RECEIVER
+
+-alertmanager takes care of routing any alerts that gets fired to any service that is configured in the alertmanager.yml configuration file
+-here we have set up a slack receiver for our alerts through the alertmanager.yml configuration file
+-for this, you also need to set up an incoming webhook integration for your slack team and update the api_url: with the value you get from the integration
+-you can also get notified when an alert is resolved through the 'send_resolved: true' setting in the config file
+
+
+SSL CONFIGURATION
+
+-finally, to make the entire set up deployable, you need to protect the monitoring site with SSL
+-for this, add the dockerised service named: lets-nginx
+-add another section for the ssl service in the docker-compose.yml file
+-lets-nginx requests new certs every time the container is launched if there is no valid cert
+-no need of re-creating the diffie hellman parameters on every strat-up
+-after setting up a generic ssl container, add an 'environments:' section to configure the ssl specific to email service
+-this will set up the environment variables which will determine the parameters lets-nginx will use during startup
+	:EMAIL and DOMAIN will configure the SSL cert
+	:UPSTREAM will tell nginx which host to proxy to
+-you also need to add a dependency of ssl on grafana because if ssl launches faster than grafana then it will prevent ssl from exiting if grafana host is unavailable
+
+
+REMOVING OPEN PORTS
+
+-SSL proxy is now added to our grafana service
+-now we need to work on the unsecured ports from other services
+-for this, remove all the 'ports:' sub-section from all the services except the one mentioned as 443 in ssl
+-sll will still be able to talk to grafana without its ports exposed because they are exposed at the container network level except externally
+-you will no longer will able to connect directl to prometheus or node-exporter at 9090 or 9100 which is really not necessary during system set-up except troubleshooting and all
+-ultimately, all the information is gathered an displayed via grafana
+

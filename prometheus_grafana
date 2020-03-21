@@ -1,0 +1,114 @@
+INTRODUCTION
+
+-choice of monitoring systems is overwhelming
+-solutions like Nagios, Sensu and New Relic for monitoring a handful of servers prove to be really heavy and expensive
+-there arose a need of better solutions that could be spin up in a container and scaled by extending configurations and components as per the requirements
+-one such monitoring system is prometheus which offers a time-series database and a de-facto graphical frontend grafana
+-used for event monitoring and alerting
+-records real-time metrics in a time series database built using a HTTP pull model, with flexible queries and real-time alerting
+
+
+PROMETHEUS
+
+-open source monitoring and alerting tool
+-monitor multiple microservices
+-modular architecture with readily available modules called exporters
+-exporters help to capture metrics from the most popular software
+-written in Go language
+-key modules in its architecture are:
+
+->prometheus server: 
+	-heart of the system
+	-collects metrics from multiple nodes and stores them locally
+	-works on the principle of scraping i.e. invoking metrics endpoints at various nodes configured to monitor
+	-collects these metrics at regular intervals 
+	-these metrics are pulled from nodes that run specific exporters
+	-exporters are modules that extract information and translate it into prometheus format which server can ingest
+	-nodes expose these over the endpoints that prometheus server scrapes
+
+->push gateway:
+	-a gateway api useful for one-off jobs
+	-run, capture the data, transform that data into prometheus data format and push that data into prometheus server
+	-comes into picture when the nodes are not exposing an endpoint from which prometheus server can collect metrics
+
+->alert manager:
+	-one half of the prometheus system is about collecting metrics
+	-defining your own alerts on those metrics is necessary to get notified in case of any discrepancies 
+	-here comes the alert manager which not only stores the alert levels but also deliver the alerts over channels like SMS, email, slack, etc.
+
+->visualisation:
+	-own user interface that can be used to check on configuration, nodes and graphs visually
+	-prometheus is compatible with grafana
+	-grafana is a leading open source visualisation application
+	-prometheus data can be viewed inside grafana
+	-prometheus also exposes an API if you are interested in writing your own clients
+
+
+COMPONENTS
+
+-system originally developed by SoundCloud
+-a move towards microservice architecture
+-consists of a few moving parts that are launched and configured separately
+-docker-compose will be used to bundle everything up as a single service with only one service definition file 
+
+->Prometheus: central piece that contains the time series database and logic of scraping stats from exporters and alerts
+
+->grafana: face of prometheus. prometheus exposes some of its internals like settings and stats received from basic web front end, it also delegates the heavy lifting of graphical displays and dashboards to grafana
+
+->alertmanager: manages the routing of alerts raised by prometheus to various channels like email, pagers and slack. while prometheus collects stats and raises alerts, alertmanager looks after where these alerts should be displayed
+
+->exporters: http endpoints that expose prometheus metrics for scraping by the prometheus server. this is a kind of pull set-up
+
+GETTING STARTED
+
+-docker-compose.yml and prometheus.yml are created in the current directory
+-localhost:9090/status
+
+Targets:
+-this section lists the prometheus endpoint
+-source of metrics provided by prometheus
+-prometheus server comes with a metrics endpoint or exporter which reports stats for the prometheus server itself
+-localhost:9090/metrics
+-targets in the scrape-configs section need to export metrics in the prometheus format
+-one such exporter is node-exporter
+
+Adding a node-exporter target:
+-provided as a part of prometheus
+-application that runs on a node 
+-collects various system metrics like cpu/memory/storage usage
+-also exposes an endpoint which the prometheus server scrapes at regular intervals and collects the metrics
+-exports the collected metrics for prometheus to scrape
+-can be run as a docker container while reporting stats for the host system
+-to bring up a node-exporter alongside prometheus, you just need to add a configuration setting to the existing docker-compose file
+
+
+GRAFANA
+
+-according to our present prometheus config file, we have a prometheus server with two probes exporting metrics
+-prometheus web front end provides a rudimentary interface to look at the metrics
+-to add grafana, just add a simple extension to the docker compose file with the service named grafana
+
+
+PERSISTENCE
+
+-services are set up via configuration files which is fine for testing but to make sure that everything persists across the restarts of the system, we need to set up docker volumes
+-these defined volumes will then be mapped into the containers where their data directories are located
+-the docker volumes will be created if they don't exist and will persist even if the containers are stopped and deleted
+
+CONFIGURING GRAFANA
+
+-specify the admin user and password and login
+-navigate to localhost:3000/datasources to set up a prometheus server as the data source for grafana
+-give it a name with type prometheus and url as http://prometheus:9090
+-now navigate to localhost:3000/datasources/new to create a new dashboard and add a graph
+-select the panel data source as My Monitor and apply filters for metric lookup
+-grafana offers a lot of options to create great looking graphs
+
+LIMITATIONS
+
+-this set up is suitable for testing and learning purposes
+-certain limitations in this set-up are:
+	-prometheus web front end is exposed to 9090 and freely accessible without authentication
+	-grafana supports authetication but is not configured with SSL
+	-automatic alerts should be set up that trigger when certain conditions are met
+	-these alerts should be delivered as notifications in ways like email or slack message
